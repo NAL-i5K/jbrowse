@@ -3165,7 +3165,7 @@ createNavBox: function( parent ) {
             var numrefs = Math.min( max, this.refSeqOrder.length);
             var options = [];
             for ( var i = 0; i < numrefs; i++ ) {
-                options.push( { label: this.refSeqOrder[i], value: this.refSeqOrder[i] } );
+                options.push( { value: this.refSeqOrder[i], label: this.config.refSeqNameTransformer?this.config.refSeqNameTransformer(this.allRefs[this.refSeqOrder[i]]):this.refSeqOrder[i] } );
             }
             var tooManyMessage = '(first '+numrefs+' ref seqs)';
             if( this.refSeqOrder.length > max ) {

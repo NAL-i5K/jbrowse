@@ -59,7 +59,6 @@ var locationThumbMover = declare( dndMove.constrainedMoveable, {
 return declare( [Component,FeatureFiltererMixin], {
 
 constructor: function( args ) {
-    console.log(">>> view constructor");
     var browser = args.browser;
     var elem = args.elem;
     var stripeWidth = args.stripeWidth;
@@ -318,7 +317,7 @@ _renderVerticalScrollBar: function() {
         'div',
         {
             className: 'vertical_scrollbar',
-            style: { position: 'fixed',
+            style: { position: 'absolute',
                      right: '0px',
                      bottom: '0px',
                      height: '100%',
@@ -326,7 +325,7 @@ _renderVerticalScrollBar: function() {
                      zIndex: 1000
                    }
         },
-        this.elem
+        this.browser.container
     );
 
     var positionMarker = dojo.create(
@@ -1374,7 +1373,7 @@ drawBasePairLabel: function ( args ){
         this.basePairLabels[name] = dojo.create( 'div', {
             className: 'basePairLabel'+(args.className ? ' '+args.className : '' ),
             style: { top: scaleTrackPos.y + scaleTrackPos.h - 3 + 'px' }
-        }, document.body );
+        }, this.browser.container);
     }
 
     var label = this.basePairLabels[name];
@@ -2033,7 +2032,7 @@ trackHeightUpdate: function(trackName, height) {
     this.updateStaticElements({ height: this.getHeight() });
 },
 
-showVisibleBlocks: function(updateHeight, pos, startX, endX) {
+showVisibleBlocks: function(updateHeight, pos, startX, endX, finishCallback) {
     if (pos === undefined) pos = this.getPosition();
     if (startX === undefined) startX = pos.x - (this.drawMargin * this.getWidth());
     if (endX === undefined) endX = pos.x + ((1 + this.drawMargin) * this.getWidth());
@@ -2051,27 +2050,51 @@ showVisibleBlocks: function(updateHeight, pos, startX, endX) {
         Math.round(this.pxToBp(this.offset
                                + (this.stripeCount * this.stripeWidth)));
 
+    let showingPromises = []
     this.overviewTrackIterate(function(track, view) {
-                                  track.showRange(0, view.overviewStripes - 1,
-                                                  view.ref.start-1, view.overviewStripeBases,
-                                                  view.overviewBox.w /
-                                                  (view.ref.end - view.ref.start));
-                      });
+        showingPromises.push( new Promise((resolve,reject) => {
+            track.showRange(
+                0,
+                view.overviewStripes - 1,
+                view.ref.start-1,
+                view.overviewStripeBases,
+                view.overviewBox.w / (view.ref.end - view.ref.start),
+                undefined,
+                undefined,
+                resolve,
+            )
+        }))
+    })
     this.trackIterate(function(track, view) {
-                          track.showRange(leftVisible, rightVisible,
-                                          startBase, bpPerBlock,
-                                          view.pxPerBp,
-                                          containerStart, containerEnd);
-                      });
+        showingPromises.push( new Promise((resolve,reject) => {
+            track.showRange(
+                leftVisible,
+                rightVisible,
+                startBase,
+                bpPerBlock,
+                view.pxPerBp,
+                containerStart,
+                containerEnd,
+                resolve,
+            )
+        }))
+    })
 
     this.updateStaticElements({
-                                  height: this.getHeight(),
-                                  width: this.getWidth(),
-                                  x: this.getX(),
-                                  y: this.getY()
-                              });
+        height: this.getHeight(),
+        width: this.getWidth(),
+        x: this.getX(),
+        y: this.getY()
+    })
 
-    this.browser.publish( '/jbrowse/v1/n/tracks/redraw' );
+    this.browser.publish( '/jbrowse/v1/n/tracks/redraw' )
+
+    const after = () => {
+        if (finishCallback) finishCallback()
+        this.browser.publish( '/jbrowse/v1/n/tracks/redrawFinished' )
+    }
+    Promise.all(showingPromises)
+        .then(after, after)
 },
 
 /**
@@ -2305,20 +2328,17 @@ renderTrack: function( /**Object*/ trackConfig ) {
 
     // get the store
     this.browser.getStore( trackConfig.store, function( s ) {
-            store = s;
-            if( trackClass && store )
-                makeTrack();
-        });
-
-    // get the track class
-    dojo.global.require( [ trackConfig.type ], function( class_ ) {
-        if(typeof class_ === "string") {
-            console.error("Failed to load module: "+trackConfig.type);
-            return;
-        }
-        trackClass = class_;
-        if( trackClass && store )
+        store = s;
+        // get the track class
+        var trackType = trackConfig.type || thisB.browser.getTrackTypes().trackTypeDefaults[store.config.type]
+        dojo.global.require( [ trackType ], function( class_ ) {
+            if(typeof class_ === "string") {
+                console.error("Failed to load module: "+trackConfig.type);
+                return;
+            }
+            trackClass = class_;
             makeTrack();
+        });
     });
 
     return trackDiv;

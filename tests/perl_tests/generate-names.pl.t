@@ -30,11 +30,13 @@ my $temp2 = File::Temp->newdir( CLEANUP => $ENV{KEEP_ALL} ? 0 : 1 );
 my ( $stdout ) = run_with (
     '--out'   => "$tempdir",
     '--workdir' => $temp2,
+#    '--verbose',
     '--hashBits' => 16,
     '--completionLimit' => 15
     );
 {
     my $got = read_names($tempdir);
+    # dircopy( $tempdir, 'tests/data/volvox_formatted_names'); # uncomment to rewrite expected data
     my $expected = read_names('tests/data/volvox_formatted_names');
     is_deeply( $got, $expected, 'got right data from volvox test data run' );
     #    or diag explain read_names($tempdir);
@@ -48,7 +50,7 @@ run_with(
     '--workdir' => $temp2,
     '--hashBits' => 16,
     '--incremental',
-    '--safeMode',
+    '--safeMode', #< note that --safeMode does not actually do anything
     '--tracks' => 'ExampleFeatures,NameTest',
     '--completionLimit' => 15
     );
@@ -83,6 +85,9 @@ sub new_volvox_sandbox {
           ) or die $!;
     copy( 'sample_data/raw/volvox/volvox.test.vcf.gz',
           "$tempdir/volvox.test.vcf.gz"
+          ) or die $!;
+    copy( 'sample_data/raw/volvox/volvox.sort.gff3.gz.1',
+          "$tempdir/volvox.sort.gff3.gz.1"
           ) or die $!;
     rmtree( "$tempdir/names" );
     return $tempdir;

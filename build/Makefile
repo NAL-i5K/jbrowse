@@ -19,6 +19,7 @@ RELEASE_DESKTOP_LINUX = $(RELEASE_NAME)-desktop-linux
 ZIP=zip -q --symlinks -r
 UNZIP=unzip -q
 SHASUM=shasum
+ELECTRON_VERSION=1.8.4
 
 
 all: clean release
@@ -27,33 +28,34 @@ release: release-dev release-min release-notes.html
 	ls -lh *.zip
 	$(SHASUM) *.zip
 
-release-electron-darwin: release
-	cd $(RELEASE_MIN)&&./setup.sh legacy&&cd ..
-	npm install
-	electron-packager $(RELEASE_MIN) JBrowseDesktop --platform=darwin --arch=x64
-	$(ZIP) $(RELEASE_DESKTOP_OSX).zip JBrowseDesktop-darwin-x64
+release-electron-setup:
+	echo "Setting up electron"
+	cd $(RELEASE_MIN) && cp -r ../node_modules ../extlib . && ./setup.sh && cd ..
+	cp -R browser $(RELEASE_MIN)
 
-release-electron-all: release
-	echo "Building desktop packages..."
-	cd $(RELEASE_MIN)&&./setup.sh legacy&&cd ..
-	npm install
-	# build all versions
-	#   electron-packager $(RELEASE_MIN) JBrowseDesktop --platform=all --arch=x64
-	# build specific versions
-	electron-packager $(RELEASE_MIN) JBrowseDesktop --platform=darwin --arch=x64
-	electron-packager $(RELEASE_MIN) JBrowseDesktop --platform=win32 --arch=ia32
-	# zap files that cause problems on windows (because of colons in filenames)
-	find JBrowseDesktop-win32-ia32 -type f -name "*.3pm" -delete &> /dev/null
-	# zip packages
-	$(ZIP) $(RELEASE_DESKTOP_OSX).zip JBrowseDesktop-darwin-x64
-	$(ZIP) $(RELEASE_DESKTOP_WIN).zip JBrowseDesktop-win32-ia32
-	#	$(ZIP) $(RELEASE_DESKTOP_LINUX).zip JBrowseDesktop-linux-x64
+release-electron-darwin: clean release-min release-electron-setup
+	echo "Building mac electron"
+	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=darwin --electron-version=$(ELECTRON_VERSION) --icon=browser/icons/jbrowse
+	$(ZIP) $(RELEASE_MIN)-desktop-darwin-x64.zip $(RELEASE_MIN)-desktop-darwin-x64
+
+release-electron-win32: clean release-min release-electron-setup
+	echo "Building win32 electron"
+	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=win32 --electron-version=$(ELECTRON_VERSION) --icon=browser/icons/jbrowse
+	$(ZIP) $(RELEASE_MIN)-desktop-win32-x64.zip $(RELEASE_MIN)-desktop-win32-x64
+
+release-electron-linux: clean release-min release-electron-setup
+	echo "Building linux electron"
+	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=linux --electron-version=$(ELECTRON_VERSION) --icon=browser/icons/jbrowse
+	$(ZIP) $(RELEASE_MIN)-desktop-linux-x64.zip $(RELEASE_MIN)-desktop-linux-x64
+
+release-electron-all: release-electron-darwin release-electron-win32 release-electron-linux
+	echo "Building desktop packages"
 
 release-notes.html: release-notes.txt
 	build/format_release_notes.pl $< > $@
 
 node_modules:
-	npm install
+	yarn install
 
 release-dev: $(JS_SRCFILES) node_modules
 	rm -rf dist
@@ -64,7 +66,7 @@ release-dev: $(JS_SRCFILES) node_modules
 	# zip up the dev release
 	$(ZIP) $(RELEASE_FULL).zip $(RELEASE_FULL)/;
 
-release-min: $(JS_SRCFILES) node_modules
+release-min: release-dev
 	cp -a $(RELEASE_FULL_DIR) $(RELEASE_MIN_DIR);
 
 	for P in src browser css docs/jsdoc tests build node_modules extlib dist; do \
@@ -91,4 +93,4 @@ release-min: $(JS_SRCFILES) node_modules
 clean:
 	git clean -ffdxq --exclude=/plugins/ --exclude=/node_modules/ --exclude=/extlib/
 
-.PHONY: all clean jbrowse docs doc release release-min release-dev plugins-min
+.PHONY: all clean jbrowse docs doc release release-min release-dev plugins-min release-electron-all release-electron-linux release-electron-win32 release-electron-darwin

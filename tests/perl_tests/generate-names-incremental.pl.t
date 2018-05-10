@@ -35,8 +35,9 @@ run_with (
     );
 {
     my $got = read_names($tempdir2);
-    my $expected = read_names('tests/data/volvox_formatted_names');
-    ok( !eq_deeply( $got, $expected ), 'expected partial name index to not match full name index' );
+    # dircopy( $tempdir2, 'tests/data/volvox_formatted_names_limited'); # uncomment to rewrite expected data
+    my $expected = read_names('tests/data/volvox_formatted_names_limited');
+    is_deeply( $got, $expected, 'got right partial name index' );
 }
 
 
@@ -48,7 +49,9 @@ run_with (
     );
 {
     my $got = read_names($tempdir2);
-    my $expected = read_names('tests/data/volvox_formatted_names');
+    # dircopy( $tempdir2, 'tests/data/volvox_formatted_names_incremental'); # uncomment to rewrite expected data
+    my $expected = read_names('tests/data/volvox_formatted_names_incremental');
+    is_deeply( $got->{"meta.json"}, $expected->{"meta.json"}, 'meta.json matches');
     is_deeply( $got, $expected, 'incremental index of the previous partial names index matched' );
 }
 done_testing;
@@ -68,6 +71,11 @@ sub new_volvox_sandbox {
     copy( 'sample_data/raw/volvox/volvox.test.vcf.gz',
           "$tempdir/volvox.test.vcf.gz"
           ) or die $!;
+    copy(
+        'sample_data/raw/volvox/volvox.sort.gff3.gz.1',
+        "$tempdir/volvox.sort.gff3.gz.1"
+    ) or die $!;
+
     rmtree( "$tempdir/names" );
     return $tempdir;
 }

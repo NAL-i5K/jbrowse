@@ -28,6 +28,7 @@ const AUTOPREFIXER_BROWSERS = [
 var webpackConf = {
     entry: {
         main: "src/JBrowse/main",
+        browser: "src/JBrowse/standalone"
     },
     plugins: [
         new CleanWebpackPlugin(['dist']),
@@ -110,6 +111,9 @@ var webpackConf = {
     },
     resolveLoader: {
         modules: ["node_modules"]
+    },
+    resolve: {
+        symlinks: false
     }
 }
 

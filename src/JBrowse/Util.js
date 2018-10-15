@@ -38,7 +38,7 @@ Util = {
     },
 
     escapeHTML: function( str ) {
-        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     },
 
     /**
@@ -220,7 +220,11 @@ Util = {
     },
 
     resolveUrl: function(baseUrl, relativeUrl) {
-        if(relativeUrl[0] == '/' && this.isElectron()) return relativeUrl;
+        if(this.isElectron()) {
+            // url.resolve does not correctly resolve absolute file urls
+            if (relativeUrl.substr(0,8) === 'file:///')
+                return relativeUrl
+        }
         return url.resolve(baseUrl, relativeUrl)
     },
 
@@ -249,59 +253,82 @@ Util = {
     },
 
     parseLocString: function( locstring ) {
-        var inloc = locstring;
         if( typeof locstring != 'string' )
             return null;
-
-        locstring = dojo.trim( locstring );
-
-        // any extra stuff in parens?
-        var extra = (locstring.match(/\(([^\)]+)\)$/)||[])[1];
-
-        // parses a number from a locstring that's a coordinate, and
-        // converts it from 1-based to interbase coordinates
-        var parseCoord = function( coord ) {
-            coord = coord+'';
-            var negative = coord.charAt(0) === '-';
-            coord = coord.replace(/\D/g,'');
-            var num = parseInt( coord, 10 );
-            if( negative )
-                num = -num;
-            return typeof num == 'number' && !isNaN(num) ? num : null;
-        };
+        locstring = locstring.trim();
 
         var location = {};
-        var tokens;
 
-        if( locstring.indexOf(':') != -1 ) {
-            tokens = locstring.split(':',2);
-            location.ref = dojo.trim( tokens[0] );
-            locstring = tokens[1];
+        // Strip out any extra info in parentheses?
+        var extraRegex = new RegExp([
+          /^\s*/                 // optional whitespace at start of locstring
+          ,/(.+?)/               // capture remaining characters, non-greedily, as the locstring without the "extra" info
+          ,/(\((.+?)\))?/        // capture the contents of the perentheses, if they exist, as the "extra" info
+          ,/\s*$/                // optional whitespace at end locstring
+        ].map(function(r) {return r.source}).join(''));
+
+        var tokens_extra = locstring.match(extraRegex);
+
+        locstring = tokens_extra[1];
+
+        if(tokens_extra[3]) {
+            location.extra = tokens_extra[3];
         }
 
-        tokens = locstring.match( /^\s*(-?[\d,]+)\s*\.\.+\s*(-?[\d,]+)/ );
-        if( tokens ) { // range of two numbers?
-            location.start = parseCoord( tokens[1] )-1;
-            location.end = parseCoord( tokens[2] );
+        // Regex to match coordinate ranges, with or without a ref seq id
+        var rangeRegex= new RegExp([
+          /^((.+):)?/                  // ref seq id
+          ,/\s*/                       // optional whitespace preceeding range
+          ,/-?([\d,]+(\.\d+)?)/        // extract positive integer part of first number - thousand separator (",") safe
+          ,/\s*/                       // optional whitespace
+          ,/(\.{2,}|-+)/               // range separator of 2 or more dots OR 1 or more hyphen
+          ,/\s*/                       // optional whitespace
+          ,/-?([\d,]+(\.\d+)?)/        // extract positive integer part of second number - thousand separator (",") safe
+          ,/\s*$/                      // optional whitespace
+        ].map(function(r) {return r.source}).join(''));
+
+        var rangeTokens = locstring.match(rangeRegex);
+
+        if( rangeTokens ) {
+            // locstring specified a range
+            location.ref = rangeTokens[2];
+            location.start = Number(rangeTokens[3].replace(/\,/g,'') );
+            location.end = Number(rangeTokens[6].replace(/\,/g,'') );
 
             // reverse the numbers if necessary
             if( location.start > location.end ) {
-                var t = location.start+1;
-                location.start = location.end - 1;
+                var t = location.start;
+                location.start = location.end;
                 location.end = t;
             }
-        }
-        else { // one number?
-            tokens = locstring.match( /^\s*(-?[\d,]+)\b/ );
-            if( tokens ) {
-                location.end = location.start = parseCoord( tokens[1] )-1;
-            }
-            else // got nothin
+        } else {
+            // locstring comprises a single point location coordinate, with or without a ref seq id
+            var pointRegex = new RegExp([
+              /^((.+):)?/               // ref
+              ,/\s*/                   // optional whitespace
+              ,/-?([\d,]+(\.\d+)?)?/   // extract positive integer part of first number - thousand separator (",") safe
+              ,/\s*$/                  // optional whitespace
+            ].map(function(r) {return r.source}).join(''));
+
+            var pointTokens = locstring.match(pointRegex);
+
+            if( pointTokens ) {
+                if( pointTokens[2] ) {
+                    location.ref = pointTokens[2];
+                }
+                if( pointTokens[3] ) {
+                    location.start = Number(pointTokens[3].replace(/\,/g,'') );
+                    location.end = location.start
+                } else {
+                    return null;
+                }
+            } else {
                 return null;
+            }
         }
 
-        if( extra )
-            location.extra = extra;
+        // Make coordinates 0-start, half-open (like BED cordinates)
+        location.start = location.start-1
 
         return location;
     },
@@ -322,7 +349,7 @@ Util = {
         return bn;
     },
 
-    assembleLocString: function( loc_in ) {
+    assembleLocString: function( loc_in, useExtra = true ) {
         var s = '',
         types = { start: 'number', end: 'number', ref: 'string', strand: 'number' },
         location = {}
@@ -356,7 +383,7 @@ Util = {
             s += ({'1':' (+ strand)', '-1': ' (- strand)', '0': ' (no strand)' }[ location.strand || '' ]) || '';
 
         // add on any extra stuff if it was passed in
-        if( 'extra' in loc_in )
+        if( useExtra && 'extra' in loc_in )
             s += loc_in.extra;
 
         return s;
@@ -393,7 +420,7 @@ Util = {
 
     assembleLocStringWithLength: function( def ) {
         var locString = Util.assembleLocString( def );
-        var length = def.length || def.end-def.start+1;
+        var length = def.length || def.end-def.start;
         return locString + ' ('+Util.humanReadableNumber( length )+'b)';
     },
 
@@ -471,8 +498,11 @@ Util = {
         return path.replace(/^(\w):/,"file:///$1:").replace(/\\/g, "/");
     },
     unReplacePath: function( path ) {
-        return path.replace(/^file:\/\/\//,"");
+        path = path.replace(/^file:\/\//,"");
+        var process = window.process;
+        return process.platform === "win32" && path[0] == "/" ? path.substr(1) : path;
     },
+
     // back-compatible way to remove properties/attributes from DOM
     // nodes.  IE 7 and older do not support the `delete` operator on
     // DOM nodes.

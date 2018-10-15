@@ -7,7 +7,8 @@ define([
             'JBrowse/Store/DeferredStatsMixin',
             'JBrowse/Store/DeferredFeaturesMixin',
             'JBrowse/Store/TabixIndexedFile',
-            'JBrowse/Store/SeqFeature/GlobalStatsEstimationMixin',
+            'JBrowse/Store/SeqFeature/IndexedStatsEstimationMixin',
+            'JBrowse/Store/SeqFeature/RegionStatsMixin',
             'JBrowse/Model/XHRBlob',
             'JBrowse/Model/SimpleFeature',
             './BED/Parser'
@@ -21,32 +22,45 @@ define([
             DeferredStatsMixin,
             DeferredFeaturesMixin,
             TabixIndexedFile,
-            GlobalStatsEstimationMixin,
+            IndexedStatsEstimationMixin,
+            RegionStatsMixin,
             XHRBlob,
             SimpleFeature,
             Parser
         ) {
 
-return declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin, GlobalStatsEstimationMixin ], {
+return declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin, IndexedStatsEstimationMixin, RegionStatsMixin ], {
 
     constructor: function( args ) {
         var thisB = this;
+        var csiBlob, tbiBlob;
 
-        var tbiBlob = args.tbi ||
-            new XHRBlob(
-                this.resolveUrl(
-                    this.getConf('tbiUrlTemplate',[]) || this.getConf('urlTemplate',[])+'.tbi'
-                )
-            );
+        if(args.csi || this.config.csiUrlTemplate) {
+            csiBlob = args.csi ||
+                new XHRBlob(
+                    this.resolveUrl(
+                        this.getConf('csiUrlTemplate',[])
+                    )
+                );
+        } else {
+            tbiBlob = args.tbi ||
+                new XHRBlob(
+                    this.resolveUrl(
+                        this.getConf('tbiUrlTemplate',[]) || this.getConf('urlTemplate',[])+'.tbi'
+                    )
+                );
+        }
 
         var fileBlob = args.file ||
             new XHRBlob(
-                this.resolveUrl( this.getConf('urlTemplate',[]) )
+                this.resolveUrl( this.getConf('urlTemplate',[]) ),
+                { expectRanges: true }
             );
 
         this.indexedData = new TabixIndexedFile(
             {
                 tbi: tbiBlob,
+                csi: csiBlob,
                 file: fileBlob,
                 browser: this.browser,
                 chunkSizeLimit: args.chunkSizeLimit || 1000000
@@ -75,32 +89,14 @@ return declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin, Gl
 
     /**fetch and parse the Header line */
     getHeader: function() {
-        var thisB = this;
-        return this._parsedHeader || ( this._parsedHeader = function() {
-                var d = new Deferred();
-                var reject = lang.hitch( d, 'reject' );
-
-                thisB.indexedData.indexLoaded.then( function() {
-                        var maxFetch = thisB.indexedData.index.firstDataLine
-                            ? (thisB.indexedData.index.firstDataLine.block + thisB.indexedData.data.blockSize - 1) * 2
-                            : null;
-
-                        thisB.indexedData.data.read(
-                            0,
-                            maxFetch,
-                            function( bytes ) {
-                                thisB.parser.parseHeader( new Uint8Array( bytes ) );
-                                d.resolve( thisB.header );
-                            },
-                            reject
-                        );
-                    },
-                    reject
-                );
-
-                return d;
-            }.call(this));
+        if (!this._parsedHeader) {
+            this._parsedHeader = this.indexedData.featureCount('nonexistent')
+                .then(() => this.indexedData.getHeader())
+                .then(bytes => this.parser.parseHeader(bytes))
+        }
+        return this._parsedHeader
     },
+
     _getFeatures: function(query, featureCallback, finishCallback, errorCallback){
         this.getHeader().then(() => {
             this.indexedData.getLines(
@@ -182,7 +178,8 @@ return declare( [ SeqFeatureStore, DeferredStatsMixin, DeferredFeaturesMixin, Gl
     saveStore: function() {
         return {
             urlTemplate: this.config.file.url,
-            tbiUrlTemplate: this.config.tbi.url
+            tbiUrlTemplate: ((this.config.tbi)||{}).url,
+            csiUrlTemplate: ((this.config.csi)||{}).url
         };
     }
 

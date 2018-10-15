@@ -62,7 +62,8 @@ sub run {
 
     my $compress = $self->opt('compress');
 
-    $self->{storage} = JsonFileStorage->new( $self->opt('out'), $self->opt('compress'), { pretty => 0 } );
+    $self->{refseqstorage} = JsonFileStorage->new( $self->opt('out'), $self->opt('compress'), { pretty => 0 } );
+    $self->{trackliststorage} = JsonFileStorage->new( $self->opt('out'), $self->opt('compress'), { pretty => 1 } );
 
     Pod::Usage::pod2usage( 'must provide either a --fasta, --indexed_fasta, --twobit, --sizes, --gff, --gff-sizes, or --conf option' )
         unless $self->opt('gff') ||
@@ -142,6 +143,7 @@ sub run {
     }
     elsif( $self->opt('sizes') ) {
         my %refseqs;
+        my @order;
         for my $sizefile ( @{$self->opt('sizes')} ) {
             open my $f, '<', $sizefile or warn "$! opening file $sizefile, skipping";
             next unless $f;
@@ -151,6 +153,7 @@ sub run {
                 my ( $name, $length ) = split /\s+/,$line,2;
                 s/^\s+|\s+$//g for $name, $length;
 
+                push @order, $name unless $refseqs{$name};
                 $refseqs{$name} = {
                     name   => $name,
                     start  => 0,
@@ -159,10 +162,11 @@ sub run {
                 };
             }
         }
-        $self->writeRefSeqsJSON( \%refseqs );
+        $self->writeRefSeqsJSON( \%refseqs, \@order );
     }
     elsif( $self->opt('gff-sizes') ) {
         my %refseqs;
+        my @order;
         for my $sizefile ( @{$self->opt('gff-sizes')} ) {
             my $f = $self->_openFile( $sizefile );
 
@@ -172,6 +176,8 @@ sub run {
                 my ( undef, $name, $start, $end ) = split /\s+/,$line,4;
                 s/^\s+|\s+$//g for $name, $start, $end;
 
+                push @order, $name unless $refseqs{$name};
+
                 $refseqs{$name} = {
                     name   => $name,
                     start  => $start-1,
@@ -180,7 +186,7 @@ sub run {
                 };
             }
         }
-        $self->writeRefSeqsJSON( \%refseqs );
+        $self->writeRefSeqsJSON( \%refseqs, \@order );
     }
 }
 
@@ -235,7 +241,7 @@ sub exportFAI {
             $refSeqs{$1} = {
                 name => $1,
                 start => 0,
-                end => $2,
+                end => $2+0,
                 offset => $3,
                 line_length => $4,
                 line_byte_length => $5
@@ -261,12 +267,13 @@ sub exportTWOBIT {
     my $header = twobit_parse_header($fh);
     my $count = $header->{CNT};
 
-    my %toc;
+    my @toc;
     my %refSeqs;
-    twobit_populate_toc($fh, $count, \%toc, $header->{unpack});
+    twobit_populate_toc($fh, $count, \@toc, $header->{unpack});
 
-    for my $name (sort keys %toc) {
-        my $offset = $toc{$name};
+    for my $rec (@toc) {
+        my $name = $rec->{name};
+        my $offset = $rec->{offset};
         my $size = twobit_fetch_record($fh, $offset, $header->{unpack});
         $refSeqs{$name} = {
             name => $name,
@@ -279,7 +286,7 @@ sub exportTWOBIT {
     my $dir = catdir( $self->opt('out'), 'seq' );
     mkpath( $dir );
     copy( $twobit, $dir ) or die "Unable to copy $twobit to $dir: $!\n";
-    $self->writeRefSeqsJSON( \%refSeqs );
+    $self->writeRefSeqsJSON( \%refSeqs, [map $_->{name}, @toc] );
 }
 
 sub exportFASTA {
@@ -427,9 +434,9 @@ sub exportDB {
 sub writeRefSeqsJSON {
     my ( $self, $refseqs, $originalorder ) = @_;
 
-    mkpath( File::Spec->catdir($self->{storage}{outDir},'seq') );
+    mkpath( File::Spec->catdir($self->{refseqstorage}{outDir},'seq') );
 
-    $self->{storage}->modify( 'seq/refSeqs.json',
+    $self->{refseqstorage}->modify( 'seq/refSeqs.json',
                                    sub {
                                        #add new ref seqs while keeping the order
                                        #of the existing ref seqs
@@ -468,9 +475,9 @@ sub writeTrackEntry {
 
     my $seqTrackName = $self->trackLabel;
     unless( $self->opt('noseq') ) {
-        $self->{storage}->touch( 'tracks.conf' );
+        $self->{trackliststorage}->touch( 'tracks.conf' );
 
-        $self->{storage}->modify( 'trackList.json',
+        $self->{trackliststorage}->modify( 'trackList.json',
                                        sub {
                                            my $trackList = shift;
                                            unless (defined($trackList)) {
@@ -640,7 +647,8 @@ sub twobit_populate_toc {
 
         # Read and store offset
         sysread($fh, $raw, FOUR_BYTE);
-        $toc->{$name} = unpack($template, $raw);
+
+        push @$toc, { name => $name, offset => unpack($template, $raw) };
     }
 }
 

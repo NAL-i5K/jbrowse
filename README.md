@@ -4,6 +4,9 @@
 
 To install jbrowse, most users should visit http://jbrowse.org/install and download a zip file such as JBrowse-1.13.0.zip. See instructions at https://jbrowse.org/code/latest-release/docs/tutorial/ for a tutorial on setting up a sample instance.
 
+Once you have an instance up and running, http://gmod.org/wiki/JBrowse_Configuration_Guide is the comprehensive reference guide to
+JBrowse configuration.
+
 
 # Install JBrowse from GitHub (for developers)
 
@@ -22,7 +25,7 @@ Alternatively, run `utils/jb_run.js -p 3000` and access http://localhost:3000/in
 
 *Also note: After editing a file, you must re-run the webpack build with `npm run build` or you can keep webpack running in "watch" mode by running  `npm run watch`.*
 
-*Also also note: git clone by default checks out the dev branch of jbrowse. The master branch contains the latest stable release*
+*Also also note: by default `git clone` will clone the master branch which contains the latest stable release. The latest development branch is called dev. Run `git checkout dev` after clone to retrieve this*
 
 # Installing as an npm module
 
@@ -82,14 +85,14 @@ To run the Electron app in debug mode run the following
 
 NOTE: Beginning in 1.12.4,
 
-1. Run `build/release.sh $newReleaseVersion $nextReleaseVersion-alpha.0`, check its work, and then run the `git push` command it suggests to you. This makes a tag in the repository for the release, named, e.g. `1.6.3-release`.  This should cause Travis CI
+1. Run `build/release.sh $newReleaseVersion $nextReleaseVersion-alpha.0 notes.txt`, where notes.txt is any additional information to add to a blogpost. Then check its work, and then run the `git push` command it suggests to you. This makes a tag in the repository for the release, named, e.g. `1.6.3-release`.  This should cause Travis CI
 to create a release on GitHub under https://github.com/GMOD/jbrowse/releases
 
-1. Add release notes to the new GitHub release that Travis created. Can just paste these from release-notes.txt, which is in Markdown format.
-
-1. Write a blog post on jbrowse.org announcing the release, with links to the built releases on GitHub. The SHA1 sums of the built release files can be seen near the end of the Travis build log, and the HTML version of the release notes can be gotten by running `make -f build/Makefile release-notes.html`.
+1. Add release notes to the new GitHub release that Travis created. Can just paste these from release-notes.md, which is in Markdown format.
 
 1. Update the latest-release code checkout on the site, which the "Latest Release" demo on the jbrowse.org points to, to be an unzipped-and-set-up copy of the latest release.
+
+1. Write a twitter post for usejbrowse and JBrowseGossip with the announcement link to the blogpost
 
 1. Write an email announcing the release, sending to gmod-ajax. If it is a major release, add gmod-announce and make a GMOD news item.
 

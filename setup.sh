@@ -27,20 +27,22 @@ log_echo () {
 }
 
 check_node () {
+    set +e
     node_executable=$(which node)
     npm_executable=$(which npm)
     if ! [ -x "$node_executable" ] ; then
         nodejs_executable=$(which nodejs)
         if ! [ -x "$nodejs_executable" ] ; then
-            echo "No 'node' or 'nodejs' executable found, you must install 'Node JS' to install JBrowse."
+            echo "No 'node' executable found. JBrowse expects node version 6 or later. Please install an updated version of node.js by following the instructions appropriate for your system https://nodejs.org/en/download/package-manager/";
             exit 1
         else
             echo "Creating an alias 'node' for 'nodejs'"
             node_executable="$nodejs_executable"
         fi
     fi
+    set -e
     if ! [ -x "$npm_executable" ] ; then
-        echo "No 'npm' executable found, you must have a proper 'Node JS' installation to install JBrowse."
+        echo "No 'npm' executable found. JBrowse expects npm version 3 or later. Please install an updated version of node.js by following the instructions appropriate for your system https://nodejs.org/en/download/package-manager/";
         exit 1
     fi
     NODE_VERSION=`$node_executable -v`
@@ -52,7 +54,7 @@ check_node () {
         echo "node $NODE_VERSION found, but node version 6 or later must be installed.  Please install an updated version of node.js by following the instructions appropriate for your system https://nodejs.org/en/download/package-manager/";
         exit 1
     fi
-    if [[ $NPM_MAJOR_VERSION < 3 ]]; then
+    if [[ $NPM_MAJOR_VERSION -lt 3 ]]; then
         echo "npm $NPM_VERSION found, but npm version 3 or later must be installed.  Please install an updated version of node.js by following the instructions appropriate for your system https://nodejs.org/en/download/package-manager/";
         exit 1
     fi
@@ -104,7 +106,7 @@ if [ $? -eq 0 ]; then
     fi
 fi
 
-log_echo "NOTE: Legacy scripts wig-to-json.pl and bam-to-json.pl have removed from setup. Their functionality has been superseded by add-bam-track.pl and add-bw-track.pl. If you require the old versions, please use JBrowse 1.12.3 or earlier."
+log_echo "NOTE: Legacy scripts wig-to-json.pl and bam-to-json.pl have been removed from setup. Their functionality has been superseded by add-bam-track.pl and add-bw-track.pl. If you require the old versions, please use JBrowse 1.12.3 or earlier."
 
 # if we are running in a development build, then run npm install and run the webpack build.
 if [ -f "src/JBrowse/Browser.js" ]; then
@@ -165,11 +167,13 @@ log_echo -n "Formatting Volvox example data ...";
         docs/tutorial/data_files/bookmarks.conf \
         docs/tutorial/data_files/volvox.subsubparts.gff3.conf \
         docs/tutorial/data_files/volvox-long-reads.fastq.sorted.bam.conf \
+        docs/tutorial/data_files/volvox-long-reads.fastq.sorted.cram.conf \
         docs/tutorial/data_files/volvox.bb.conf >> sample_data/json/volvox/tracks.conf \
+        docs/tutorial/data_files/volvox-sorted.cram.conf >> sample_data/json/volvox/tracks.conf \
     >> sample_data/json/volvox/tracks.conf
 
     bin/add-json.pl '{ "dataset_id": "volvox", "include": [ "../../raw/volvox/functions.conf" ] }' sample_data/json/volvox/trackList.json
-    bin/add-json.pl '{ "dataset_id": "volvox", "plugins": [ "HideTrackLabels" ] }' sample_data/json/volvox/trackList.json
+    bin/add-json.pl '{ "dataset_id": "volvox", "plugins": [ "HideTrackLabels", "NeatCanvasFeatures", "NeatHTMLFeatures" ] }' sample_data/json/volvox/trackList.json
     bin/flatfile-to-json.pl --bed docs/tutorial/data_files/volvox_segment.bed --out sample_data/json/volvox --trackLabel ChromHMM --trackType CanvasFeatures --clientConfig '{"color": "{chromHMM}", "strandArrow": false}' --config '{"displayMode": "collapsed", "enableCollapsedMouseover": true, "category": "Miscellaneous" }';
     bin/generate-names.pl --safeMode -v --out sample_data/json/volvox;
 

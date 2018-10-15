@@ -95,18 +95,27 @@ return declare( null, {
                         { label: "BAM",         value: "bam"    },
                         { label: "BAM index",   value: "bam.bai"},
                         { label: "FASTA",       value: "fasta"  },
+                        { label: "FASTA index", value: "fai"    },
+                        { label: "BGZIP FASTA", value: "fasta.gz"  },
+                        { label: "BGZIP FASTA index (.gz.fai)", value: "fasta.gz.fai"  },
+                        { label: "BGZIP index (.gz.gzi)",   value: "gzi"    },
                         { label: "2bit",        value: "2bit"   },
                         { label: "BigBed",      value: "bb"     },
-                        { label: "FASTA index", value: "fai"    },
                         { label: "VCF+bgzip",   value: "vcf.gz" },
                         { label: "VCF",         value: "vcf"    },
                         { label: "IGV/GATK Index", value: "idx" },
                         { label: "BED+bgzip",   value: "bed.gz" },
                         { label: "BED",         value: "bed"    },
                         { label: "GFF3+bgzip",  value: "gff3.gz"},
-                        { label: "Tabix index", value: "vcf.gz.tbi" },
-                        { label: "Tabix index", value: "gff3.gz.tbi" },
-                        { label: "Tabix index", value: "bed.gz.tbi" }
+                        { label: "VCF+Tabix index", value: "vcf.gz.tbi" },
+                        { label: "GFF3+Tabix index", value: "gff3.gz.tbi" },
+                        { label: "BED+Tabix index", value: "bed.gz.tbi" },
+                        { label: "BED+CSI index", value: "bed.gz.csi" },
+                        { label: "VCF+CSI index", value: "vcf.gz.csi" },
+                        { label: "GFF3+CSI index", value: "gff3.gz.csi" },
+                        { label: "BAM+CSI index", value: "bam.csi" },
+                        { label: "CRAM",   value: "cram"        },
+                        { label: "CRAM index",   value: "cram.crai"},
                     ],
                     value: this.guessType( name ),
                     onChange: function() {
@@ -155,23 +164,32 @@ return declare( null, {
     guessType: function( name ) {
         return ( this._rememberedTypes||{} )[name] || (
                 /\.bam$/i.test( name )          ? 'bam'    :
-                /\.bam.bai$/i.test( name )      ? 'bam.bai'    :
+                /\.bai$/i.test( name )          ? 'bam.bai'    :
                 /\.gff3?$/i.test( name )        ? 'gff3'   :
                 /\.gtf?$/i.test( name )         ? 'gtf'    :
                 /\.(bw|bigwig)$/i.test( name )  ? 'bigwig' :
-                /\.(fa|fasta)$/i.test( name )   ? 'fasta'  :
+                /\.(fa|fasta|fna|mfa)$/i.test( name )   ? 'fasta'  :
+                /\.(fa|fasta|fna|mfa)\.gz$/i.test( name ) ? 'fasta.gz':
+                /\.(fa|fasta|fna|mfa)\.gz\.fai$/i.test( name ) ? 'fasta.gz.fai':
                 /\.2bit$/i.test( name )         ? '2bit'   :
                 /\.fai$/i.test( name )          ? 'fai'    :
                 /\.idx$/i.test( name )          ? 'idx'    :
                 /\.vcf$/i.test( name )          ? 'vcf'    :
                 /\.vcf\.gz$/i.test( name )      ? 'vcf.gz' :
                 /\.bed\.gz$/i.test( name )      ? 'bed.gz' :
+                /\.gzi$/i.test( name )          ? 'gzi'    :
+                /\.gff3?\.gz$/i.test( name )    ? 'gff3.gz':
                 /\.bed$/i.test( name )          ? 'bed'    :
                 /\.(bb|bigbed)$/i.test( name )  ? 'bb'     :
-                /\.gff3?\.gz$/i.test( name )    ? 'gff3.gz':
                 /\.gff3?\.gz.tbi$/i.test( name )? 'gff3.gz.tbi' :
                 /\.vcf.gz.tbi$/i.test( name )   ? 'vcf.gz.tbi'  :
                 /\.bed.gz.tbi$/i.test( name )   ? 'bed.gz.tbi'  :
+                /\.bed.gz.csi/i.test( name )    ? 'bed.gz.csi'  :
+                /\.gff3?\.gz.csi$/i.test( name )? 'gff3.gz.csi'  :
+                /\.vcf.gz.csi$/i.test( name )   ? 'vcf.gz.csi'  :
+                /\.bam.csi$/i.test( name )      ? 'bam.csi'  :
+                /\.cram$/i.test( name )         ? 'cram'  :
+                /\.crai$/i.test( name )         ? 'cram.crai'  :
                                                   null
         );
     }

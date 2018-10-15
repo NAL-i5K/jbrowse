@@ -11,6 +11,7 @@ define( [
             'JBrowse/Store/DeferredFeaturesMixin',
             'JBrowse/Store/DeferredStatsMixin',
             'JBrowse/Store/SeqFeature/GlobalStatsEstimationMixin',
+            'JBrowse/Store/SeqFeature/RegionStatsMixin',
             'JBrowse/Model/XHRBlob'
         ],
         function(
@@ -24,10 +25,11 @@ define( [
             DeferredFeatures,
             DeferredStats,
             GlobalStatsEstimationMixin,
+            RegionStatsMixin,
             XHRBlob,
         ) {
 
-return declare([ SeqFeatureStore, DeferredFeatures, DeferredStats, GlobalStatsEstimationMixin ],
+return declare([ SeqFeatureStore, DeferredFeatures, DeferredStats, GlobalStatsEstimationMixin, RegionStatsMixin ],
 
  /**
   * @lends JBrowse.Store.SeqFeature.GFF3
@@ -185,75 +187,16 @@ return declare([ SeqFeatureStore, DeferredFeatures, DeferredStats, GlobalStatsEs
         delete f.attributes;
         f.start -= 1; // convert to interbase
         f.strand = {'+': 1, '-': -1, '.': 0, '?': undefined }[data.strand];
-
-        for( var a in data.attributes ) {
-            f[ a.toLowerCase() ] = data.attributes[a].join(',');
+        for (var a in data.attributes) {
+            let b = a.toLowerCase();
+            f[b] = data.attributes[a]
+            if(f[b].length == 1) f[b] = f[b][0]
         }
         var sub = array.map( Util.flattenOneLevel( data.child_features ), this._featureData, this );
         if( sub.length )
             f.subfeatures = sub;
 
         return f;
-    },
-
-
-    getRegionFeatureDensities(query, successCallback, errorCallback) {
-        let numBins
-        let basesPerBin
-
-        if (query.numBins) {
-            numBins = query.numBins;
-            basesPerBin = (query.end - query.start)/numBins
-        } else if (query.basesPerBin) {
-            basesPerBin = query.basesPerBin || query.ref.basesPerBin
-            numBins = Math.ceil((query.end-query.start)/basesPerBin)
-        } else {
-            throw new Error('numBins or basesPerBin arg required for getRegionFeatureDensities')
-        }
-
-        const statEntry = (function (basesPerBin, stats) {
-            for (var i = 0; i < stats.length; i++) {
-                if (stats[i].basesPerBin >= basesPerBin) {
-                    return stats[i]
-                }
-            }
-            return undefined
-        })(basesPerBin, [])
-
-        const stats = {}
-        stats.basesPerBin = basesPerBin
-
-        stats.scoreMax = 0
-        stats.max = 0
-        const firstServerBin = Math.floor( query.start / basesPerBin)
-        const histogram = []
-        const binRatio = 1 / basesPerBin
-
-        let binStart
-        let binEnd
-
-        for (var bin = 0 ; bin < numBins ; bin++) {
-            histogram[bin] = 0
-        }
-
-        this._getFeatures(query,
-            feat => {
-                let binValue = Math.round( (feat.get('start') - query.start )* binRatio)
-                let binValueEnd = Math.round( (feat.get('end') - query.start )* binRatio)
-
-                for(let bin = binValue; bin < binValueEnd; bin++) {
-                    histogram[bin] += 1
-                    if (histogram[bin] > stats.max) {
-                        stats.max = histogram[bin]
-                    }
-                }
-            },
-            () => {
-                successCallback({ bins: histogram, stats: stats})
-            },
-            errorCallback
-        );
-
     },
 
     /**

@@ -15,7 +15,7 @@ var FileBlob = declare( null,
      * Blob of binary data fetched from a local file (with FileReader).
      *
      * Adapted by Robert Buels from the BlobFetchable object in the
-     * Dalliance Genome Explorer, which was is copyright Thomas Down
+     * Dalliance Genome Explorer, which is copyright Thomas Down
      * 2006-2011.
      * @constructs
      */
@@ -73,28 +73,52 @@ var FileBlob = declare( null,
     read: function( offset, length, callback, failCallback ) {
         var start = this.start + offset,
             end = start + length;
+
+        // short-circuit a read of 0 bytes here, because browsers
+        // actually sometimes crash if you try to read 0 bytes from
+        // a local file!
+        if (!length) {
+            callback(new ArrayBuffer())
+            return
+        }
+
         this.slice( offset, length )
             .fetch( callback, failCallback );
     },
 
-    fetch: function( callback, failCallback ) {
-        var that = this,
-            reader = new FileReader();
-        reader.onloadend = function(ev) {
-            callback( that._stringToBuffer( reader.result ) );
-        };
-        reader.readAsBinaryString( this.blob );
+    readBufferPromise(offset,length) {
+        return new Promise((resolve,reject) => {
+            this.read(offset, length, data => {
+                resolve(window.Buffer.from(data))
+            }, reject)
+        })
     },
 
-    _stringToBuffer: function(result) {
-        if( ! result || ! has('typed-arrays') )
-            return null;
+    fetch: function( callback, failCallback ) {
+        try {
+            const reader = new FileReader()
+            reader.onloadend = ev => {
+                callback( reader.result )
+            }
+            reader.onerror = failCallback
+            reader.readAsArrayBuffer(this.blob)
+        } catch(e) { failCallback(e) }
+    },
 
-        var ba = new Uint8Array( result.length );
-        for ( var i = 0; i < ba.length; i++ ) {
-            ba[i] = result.charCodeAt(i);
-        }
-        return ba.buffer;
+    fetchBufferPromise() {
+        return new Promise((resolve,reject) => {
+            this.fetch(data => {
+                resolve(window.Buffer.from(data))
+            }, reject)
+        })
+    },
+
+    stat(callback,failCallback) {
+        this.statPromise().then(callback, failCallback)
+    },
+
+    async statPromise() {
+        return { size: this.blob.size }
     }
 
 });

@@ -33,13 +33,16 @@ return declare( null, {
             var start = Math.max( 0, Math.round( sampleCenter - length/2 ) );
             var end = Math.min( Math.round( sampleCenter + length/2 ), refseq.end );
             var features = [];
+            //console.log(`${this.source} stats fetching ${refseq.name}:${start}..${end}`)
             this._getFeatures({ ref: refseq.name, start: start, end: end},
                               function( f ) { features.push(f); },
                               function( error ) {
                                   features = array.filter( features, function(f) { return f.get('start') >= start && f.get('end') <= end; } );
+                                  const correctionFactor = (thisB.getConf('topLevelFeaturesPercent') || 100) / 100
                                   callback.call( thisB, length,
                                                  {
-                                                     featureDensity: features.length / length,
+                                                     featureDensity: features.length / length * correctionFactor,
+                                                     _correctionFactor: correctionFactor,
                                                      _statsSampleFeatures: features.length,
                                                      _statsSampleInterval: { ref: refseq.name, start: start, end: end, length: length }
                                                  });
@@ -51,7 +54,7 @@ return declare( null, {
 
         var maybeRecordStats = function( interval, stats, error ) {
             if( error ) {
-                if( error.isInstanceOf(Errors.DataOverflow) ) {
+                if( error.isInstanceOf && error.isInstanceOf(Errors.DataOverflow) ) {
                      console.log( 'Store statistics found chunkSizeLimit error, using empty: '+(this.source||this.name) );
                      deferred.resolve( { featureDensity: 0, error: 'global stats estimation found chunkSizeError' } );
                 }

@@ -1,3 +1,5 @@
+const url = cjsRequire('url')
+
 define( [
             'dojo/_base/declare',
             'dojo/_base/lang',
@@ -50,6 +52,7 @@ define( [
             'JBrowse/View/StandaloneDatasetList',
             'JBrowse/Store/SeqFeature/UnindexedFasta',
             'JBrowse/Store/SeqFeature/IndexedFasta',
+            'JBrowse/Store/SeqFeature/BgzipIndexedFasta',
             'JBrowse/Store/SeqFeature/TwoBit',
             'dijit/focus',
             '../lazyload.js', // for dynamic CSS loading
@@ -112,6 +115,7 @@ define( [
             StandaloneDatasetList,
             UnindexedFasta,
             IndexedFasta,
+            BgzipIndexedFasta,
             TwoBit,
             dijitFocus,
             LazyLoad,
@@ -920,6 +924,23 @@ initView: function() {
                 }
             }));
 
+            if (!this.config.disableSearch) {
+                this.addGlobalMenuItem( 'view', new dijitMenuItem({
+                    label: 'Search features',
+                    id: 'menubar_search',
+                    title: 'Search for features',
+                    onClick: () => {
+                        var conf = dojo.mixin( dojo.clone( this.config.names || {} ),
+                                               this.config.autocomplete || {} );
+
+                        var type = conf.dialog || 'JBrowse/View/Dialog/Search';
+                        dojo.global.require ([type], CLASS => {
+                            new CLASS(dojo.mixin({ browser: this }, conf)).show();
+                        });
+                    }
+                }));
+            }
+
             this.renderGlobalMenu( 'view', {text: 'View'}, menuBar );
 
             // make the options menu
@@ -1272,7 +1293,17 @@ openFastaElectron: function() {
                     refSeqOrder: results.refSeqOrder
                 };
 
-                if( confs[0].store.fasta && confs[0].store.fai ) {
+                if( confs[0].store.bgzfa && confs[0].store.fai && confs[0].store.gzi) {
+                    var fasta = Util.replacePath( confs[0].store.bgzfa.url );
+                    var fai = Util.replacePath( confs[0].store.fai.url );
+                    var gzi = Util.replacePath( confs[0].store.gzi.url );
+                    trackList.tracks[0].storeClass= 'JBrowse/Store/SeqFeature/BgzipIndexedFasta';
+                    trackList.tracks[0].urlTemplate = fasta;
+                    trackList.tracks[0].faiUrlTemplate = fai;
+                    trackList.tracks[0].gziUrlTemplate = gzi;
+                    trackList.refSeqs = fai;
+                }
+                else if( confs[0].store.fasta && confs[0].store.fai ) {
                     var fasta = Util.replacePath( confs[0].store.fasta.url );
                     var fai = Util.replacePath( confs[0].store.fai.url );
                     trackList.tracks[0].storeClass= 'JBrowse/Store/SeqFeature/IndexedFasta';
@@ -1348,7 +1379,8 @@ openFasta: function() {
                           this.teardown()
                           var newBrowser = new this.constructor({
                               refSeqs: { data: refSeqs },
-                              refSeqOrder: results.refSeqOrder
+                              refSeqOrder: results.refSeqOrder,
+                              dataRoot: null
                           })
                           newBrowser.afterMilestone('completely initialized', () => {
                               storeConf.name = 'refseqs' // important to make it the refseq store
@@ -1448,6 +1480,7 @@ getTrackTypes: function() {
             // map of store type -> default track type to use for the store
             trackTypeDefaults: {
                 'JBrowse/Store/SeqFeature/BAM'         : 'JBrowse/View/Track/Alignments2',
+                'JBrowse/Store/SeqFeature/CRAM'         : 'JBrowse/View/Track/Alignments2',
                 'JBrowse/Store/SeqFeature/NCList'      : 'JBrowse/View/Track/CanvasFeatures',
                 'JBrowse/Store/SeqFeature/BigWig'      : 'JBrowse/View/Track/Wiggle/XYPlot',
                 'JBrowse/Store/SeqFeature/VCFTabix'    : 'JBrowse/View/Track/CanvasVariants',
@@ -1461,6 +1494,7 @@ getTrackTypes: function() {
                 'JBrowse/Store/SeqFeature/StaticChunked' : 'JBrowse/View/Track/Sequence',
                 'JBrowse/Store/SeqFeature/UnindexedFasta': 'JBrowse/View/Track/Sequence',
                 'JBrowse/Store/SeqFeature/IndexedFasta'  : 'JBrowse/View/Track/Sequence',
+                'JBrowse/Store/SeqFeature/BgzipIndexedFasta'  : 'JBrowse/View/Track/Sequence',
                 'JBrowse/Store/SeqFeature/TwoBit'        : 'JBrowse/View/Track/Sequence'
             },
 
@@ -2010,8 +2044,8 @@ afterMilestone: function( name, func, ctx ) {
         .then( function() {
                    try {
                        func.call( ctx || this );
-                   } catch( e ) {
-                       console.error( ''+e, e.stack, e );
+                   } catch (e) {
+                       console.error(e instanceof Error ? e : String(e), e.stack)
                    }
                });
 },
@@ -2039,6 +2073,19 @@ reachedMilestone: function( name ) {
  */
 loadConfig: function () {
     return this._milestoneFunction( 'loadConfig', function( deferred ) {
+
+        // check the config.dataRoot parameter before loading, unless allowCrossSiteDataRoot is on.
+        // this prevents an XSS attack served from a malicious server that has CORS enabled. thanks to @cmdcolin
+        // for noticing this.
+        if (this.config.dataRoot && this.config.dataRoot !== 'data' && !this.config.allowCrossOriginDataRoot) {
+            const parsedDataRoot = url.parse(url.resolve(window.location.href,this.config.dataRoot))
+            if (parsedDataRoot.host) {
+                const currentParsed = url.parse(window.location.href)
+                if (parsedDataRoot.host !== currentParsed.host || parsedDataRoot.protocol !== currentParsed.protocol)
+                    throw new Error('Invalid JBrowse dataRoot setting. For security, absolute URLs are not allowed. Set `allowCrossOriginDataRoot` to true to disable this security check.')
+            }
+        }
+
         var c = new ConfigManager({ bootConfig: this.config, defaults: this._configDefaults(), browser: this });
         c.getFinalConfig()
          .then( dojo.hitch(this, function( finishedConfig ) {
@@ -2171,15 +2218,36 @@ _configDefaults: function() {
 },
 
 /**
+ * get the numerical ID number of the given reference sequence name.  required for CRAM files, which
+ * only operate on reference sequence ID numbers.
+ * @param {string} refSeqName
+ */
+getRefSeqNumber(refSeqName) {
+    return this.allRefs[refSeqName].id
+},
+
+/**
+ * get a reference sequence by its numerical id number. used mostly by CRAM stores.
+ * @param {number} id
+ */
+getRefSeqById(id) {
+    return this.refSeqsById[id]
+},
+
+/**
  * @param refSeqs {Array} array of refseq records to add to the browser
  */
 addRefseqs: function( refSeqs ) {
-    var allrefs = this.allRefs = this.allRefs || {};
+    if (!this.allRefs) this.allRefs = {}
 
-    dojo.forEach( refSeqs, function(r) {
+    refSeqs.forEach((r, id) => {
+        // save the original index of the reference for
+        // use with CRAM and other numerical-refseq-id stores
+        r.id = id
         this.allRefs[r.name] = r;
-    },this);
+    })
 
+    this.refSeqsById = refSeqs
 
     // generate refSeqOrder
     this.refSeqOrder =
@@ -2388,24 +2456,20 @@ navigateTo: function(loc) {
                       if( found )
                           return;
 
+                      // First check if loc is the name of a ref seq before attempting to parse the locstring for basepair location info
+                      var ref = thisB.findReferenceSequence( loc );
+                      if( ref ) {
+                          thisB.navigateToLocation( { ref: ref.name } );
+                          return;
+                      }
+
+                      // Not a known ref seq name - now lets parse the loc string
                       // if it's a foo:123..456 location, go there
                       var location = typeof loc == 'string' ? Util.parseLocString( loc ) :  loc;
                       // only call navigateToLocation() directly if location has start and end, otherwise try and fill in start/end from 'location' cookie
                       if( location && ("start" in location) && ("end" in location)) {
                           thisB.navigateToLocation( location );
                           return;
-                      }
-                      // otherwise, if it's just a word (or a location with only a ref property), try to figure out what it is
-                      else {
-                          if( typeof loc != 'string')
-                              loc = loc.ref;
-
-                          // is it just the name of one of our ref seqs?
-                          var ref = thisB.findReferenceSequence( loc );
-                          if( ref ) {
-                              thisB.navigateToLocation( { ref: ref.name } );
-                              return;
-                          }
                       }
 
                       new InfoDialog(
@@ -2848,7 +2912,7 @@ _updateRefSeqSelectBox: function() {
  * update the location and refseq cookies
  */
 _updateLocationCookies: function( location ) {
-    var locString = typeof location == 'string' ? location : Util.assembleLocString( location );
+    var locString = typeof location == 'string' ? location : Util.assembleLocString( location, false );
     var oldLocMap = dojo.fromJson( this.cookie('location') ) || { "_version": 1 };
     if( ! oldLocMap["_version"] )
         oldLocMap = this._migrateLocMap( oldLocMap );

@@ -4,27 +4,21 @@ JSDIR = $(BASEDIR)/src/JBrowse
 PLUGINDIR = $(BASEDIR)/plugins
 JS_SRCFILES = $(shell find $(JSDIR) -type f -and -name '*.js')
 
-CSS_SRCFILES = $(shell find $(BASEDIR) -type f -and -name '*.css')
-
 RELEASE_VERSION = $(shell node -e 'require("fs").readFile("$(JSDIR)/package.json", function(e,d){console.log(JSON.parse(d).version)})')
 RELEASE_NAME = JBrowse-$(RELEASE_VERSION)
-RELEASE_FULL = $(RELEASE_NAME)-dev
-RELEASE_FULL_DIR = $(BASEDIR)/$(RELEASE_FULL)/
 RELEASE_MIN  = $(RELEASE_NAME)
 RELEASE_MIN_DIR  = $(BASEDIR)/$(RELEASE_MIN)/
-RELEASE_DESKTOP_OSX = $(RELEASE_NAME)-desktop-osx
-RELEASE_DESKTOP_WIN = $(RELEASE_NAME)-desktop-win
-RELEASE_DESKTOP_LINUX = $(RELEASE_NAME)-desktop-linux
 
 ZIP=zip -q --symlinks -r
 UNZIP=unzip -q
 SHASUM=shasum
-ELECTRON_VERSION=1.8.4
+
+ELECTRON_PACKAGE_OPTS = --overwrite --icon=browser/icons/jbrowse --ignore=/tests/ --ignore=/website/ --ignore=/src/perl5/ --ignore=/extlib/ --ignore=/docs/
 
 
 all: clean release
 
-release: release-dev release-min release-notes.html
+release: release-dev release-min release-electron-all release-notes.html
 	ls -lh *.zip
 	$(SHASUM) *.zip
 
@@ -33,19 +27,19 @@ release-electron-setup:
 	cd $(RELEASE_MIN) && cp -r ../node_modules ../extlib . && ./setup.sh && cd ..
 	cp -R browser $(RELEASE_MIN)
 
-release-electron-darwin: clean release-min release-electron-setup
+release-electron-darwin: release-min release-electron-setup
 	echo "Building mac electron"
-	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=darwin --electron-version=$(ELECTRON_VERSION) --icon=browser/icons/jbrowse
+	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=darwin $(ELECTRON_PACKAGE_OPTS)
 	$(ZIP) $(RELEASE_MIN)-desktop-darwin-x64.zip $(RELEASE_MIN)-desktop-darwin-x64
 
-release-electron-win32: clean release-min release-electron-setup
+release-electron-win32: release-min release-electron-setup
 	echo "Building win32 electron"
-	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=win32 --electron-version=$(ELECTRON_VERSION) --icon=browser/icons/jbrowse
+	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=win32 $(ELECTRON_PACKAGE_OPTS)
 	$(ZIP) $(RELEASE_MIN)-desktop-win32-x64.zip $(RELEASE_MIN)-desktop-win32-x64
 
-release-electron-linux: clean release-min release-electron-setup
+release-electron-linux: release-min release-electron-setup
 	echo "Building linux electron"
-	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=linux --electron-version=$(ELECTRON_VERSION) --icon=browser/icons/jbrowse
+	node_modules/.bin/electron-packager $(RELEASE_MIN) $(RELEASE_MIN)-desktop --platform=linux $(ELECTRON_PACKAGE_OPTS)
 	$(ZIP) $(RELEASE_MIN)-desktop-linux-x64.zip $(RELEASE_MIN)-desktop-linux-x64
 
 release-electron-all: release-electron-darwin release-electron-win32 release-electron-linux
@@ -56,20 +50,12 @@ release-notes.html: release-notes.md
 
 node_modules:
 	yarn install
-
-release-dev: $(JS_SRCFILES) node_modules
+release-min: node_modules
 	rm -rf dist
-	mkdir $(RELEASE_FULL_DIR);
-	cp -R `ls -1d * | grep -v $(RELEASE_FULL)` $(RELEASE_FULL_DIR);
-	rm -rf $(RELEASE_FULL_DIR)/src/*/.git $(RELEASE_FULL_DIR)/$(RELEASE_FULL) $(RELEASE_FULL_DIR)/src/util $(RELEASE_FULL_DIR)/node_modules $(RELEASE_FULL_DIR)/extlib;
+	mkdir $(RELEASE_MIN);
+	cp -R `ls -1d * | grep -v $(RELEASE_MIN)` $(RELEASE_MIN_DIR);
 
-	# zip up the dev release
-	$(ZIP) $(RELEASE_FULL).zip $(RELEASE_FULL)/;
-
-release-min: release-dev
-	cp -a $(RELEASE_FULL_DIR) $(RELEASE_MIN_DIR);
-
-	for P in src browser css docs/jsdoc tests build node_modules extlib dist; do \
+	for P in src browser css docs/jsdoc tests build node_modules extlib dist utils website; do \
 	    rm -rf $(RELEASE_MIN_DIR)$$P; \
 	done;
 

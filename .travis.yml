@@ -69,7 +69,6 @@ script:
 - set +e
 - website/build.sh
 after_failure:
-- echo "FAILED"
 - cat setup.log
 before_cache:
 - rm -f node_modules/.cache

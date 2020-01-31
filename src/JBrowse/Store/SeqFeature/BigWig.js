@@ -90,9 +90,8 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
             this.data.read.apply( this.data, arguments );
     },
 
-    _load: function(headerLen = 2000) {
-        this._read( 0, headerLen, async ( bytes ) => {
-            try {
+    _load: function() {
+        this._read( 0, 2000, async ( bytes ) => {
             const res = await this.data.statPromise()
             if( ! bytes ) {
                 this._failAllDeferred( 'BBI header not readable' );
@@ -129,9 +128,7 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
             this.asOffset = data.getUint64();
             this.totalSummaryOffset = data.getUint64();
             this.uncompressBufSize = data.getUint32();
-            if(this.asOffset > headerLen || this.totalSummaryOffset > headerLen) {
-                return this._load(headerLen*2)
-            }
+
 
             // dlog('bigType: ' + this.type);
             // dlog('chromTree at: ' + this.chromTreeOffset);
@@ -150,8 +147,6 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
                 //          dlog('zoom(' + zl + '): reduction=' + zlReduction + '; data=' + zlData + '; index=' + zlIndex);
                 this.zoomLevels.push({reductionLevel: zlReduction, dataOffset: zlData, indexOffset: zlIndex});
             }
-
-
 
 
             // parse the autoSql if present (bigbed)
@@ -192,12 +187,9 @@ return declare([ SeqFeatureStore, DeferredFeaturesMixin, DeferredStatsMixin ],
                 },
                 lang.hitch( this, '_failAllDeferred' )
             );
-            } catch(e) {
-                this._failAllDeferred(e)
-            }
         },
         lang.hitch( this, '_failAllDeferred' )
-       )
+       );
     },
 
     newDataView: function( bytes, offset, length ) {

@@ -152,7 +152,7 @@ return declare( null, {
                 // padding
             } else if (code === 'H') {
                 // hard clip
-                const len = data
+                const len = data.length
                 mismatches.push({
                     start: refPos,
                     type: 'hardclip',

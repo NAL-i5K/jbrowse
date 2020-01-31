@@ -60,7 +60,6 @@ describe( 'centralized ref seq name regularization', function() {
         [ 'XVI', 'chrxvi' ] ,
         [ 'mt', 'chrm' ],
         [ 'M', 'chrm' ],
-        [ 'MtDNA', 'chrm' ],
         [ 'chr2L', 'chr2l' ],
         [ '2L', 'chr2l' ],
         [ '2R', 'chr2r' ],

@@ -1,5 +1,4 @@
 [![Build status](https://travis-ci.org/GMOD/jbrowse.svg?branch=dev)](https://travis-ci.org/GMOD/jbrowse)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v1.4%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 # Installing JBrowse
 
@@ -96,8 +95,6 @@ NOTE: Beginning in 1.12.4,
 
 1. Run `build/release.sh $newReleaseVersion $nextReleaseVersion-alpha.0 notes.txt`, where notes.txt is any additional information to add to a blogpost. Then check its work, and then run the `git push` command it suggests to you. This makes a tag in the repository for the release, named, e.g. `1.6.3-release`.  This should cause Travis CI
 to create a release on GitHub under https://github.com/GMOD/jbrowse/releases
-
-1. Test that the page loads in IE11 on BrowserStack
 
 1. Add release notes to the new GitHub release that Travis created. Can just paste these from release-notes.md, which is in Markdown format.
 

@@ -28,7 +28,6 @@ var Meta = declare( null,
      * @param args.metadataStores {Array[dojox.data]}
      */
     constructor: function( args ) {
-        this.sortFacets = args.sortFacets !== undefined ? args.sortFacets : true
         // set up our facet name discrimination: what facets we will
         // actually provide search on
         var non_facet_attrs = ['conf'];
@@ -198,10 +197,9 @@ var Meta = declare( null,
      * @private
      */
     _finishLoad: function() {
+
         // sort the facet names
-        if (this.sortFacets) {
-            this.facets.sort();
-        }
+        this.facets.sort();
 
         // calculate the average bucket size for each facet index
         dojo.forEach( dojof.values( this.facetIndexes.byName ), function(bucket) {

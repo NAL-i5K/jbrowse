@@ -567,71 +567,58 @@ loadRefSeqs: function() {
             };
         }
 
-        if(this.config.refSeqs.storeClass) {
-            dojo.global.require([this.config.refSeqs.storeClass],
-                (CLASS) => {
-                    const r = new CLASS(Object.assign({browser: this},this.config.refSeqs))
-                    r.getRefSeqs(function(refSeqs) {
-                        thisB.addRefseqs(refSeqs);
-                        deferred.resolve({success:true})
-                    }, function(error) {
-                        deferred.reject(error)
-                    })
-            })
+        // check refseq urls
+        if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.fai$/) ) {
+            new IndexedFasta({browser: this, faiUrlTemplate: this.config.refSeqs.url})
+                .getRefSeqs(function(refSeqs) {
+                    thisB.addRefseqs(refSeqs);
+                    deferred.resolve({success:true});
+                }, function(error) {
+                    deferred.reject(error);
+                });
+            return;
+        } else if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.2bit$/) ) {
+            new TwoBit({browser: this, urlTemplate: this.config.refSeqs.url})
+                .getRefSeqs(function(refSeqs) {
+                    thisB.addRefseqs(refSeqs);
+                    deferred.resolve({success:true});
+                }, function(error) {
+                    deferred.reject(error);
+                });
+        } else if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.fa$/) ) {
+            new UnindexedFasta({browser: this, urlTemplate: this.config.refSeqs.url})
+                .getRefSeqs(function(refSeqs) {
+                    thisB.addRefseqs(refSeqs);
+                    deferred.resolve({success:true});
+                }, function(error) {
+                    deferred.reject(error);
+                });
+        } else if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.sizes/) ) {
+            new ChromSizes({browser: this, urlTemplate: this.config.refSeqs.url})
+                .getRefSeqs(function(refSeqs) {
+                    thisB.addRefseqs(refSeqs);
+                    deferred.resolve({success:true});
+                }, function(error) {
+                    deferred.reject(error);
+                });
+        } else if( 'data' in this.config.refSeqs ) {
+            this.addRefseqs( this.config.refSeqs.data );
+            deferred.resolve({success:true});
         } else {
-            // check refseq urls
-            if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.fai$/) ) {
-                new IndexedFasta({browser: this, faiUrlTemplate: this.config.refSeqs.url})
-                    .getRefSeqs(function(refSeqs) {
-                        thisB.addRefseqs(refSeqs);
-                        deferred.resolve({success:true});
-                    }, function(error) {
-                        deferred.reject(error);
-                    });
-                return;
-            } else if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.2bit$/) ) {
-                new TwoBit({browser: this, urlTemplate: this.config.refSeqs.url})
-                    .getRefSeqs(function(refSeqs) {
-                        thisB.addRefseqs(refSeqs);
-                        deferred.resolve({success:true});
-                    }, function(error) {
-                        deferred.reject(error);
-                    });
-            } else if( this.config.refSeqs.url && (this.config.refSeqs.url.match(/.fa$/)||this.config.refSeqs.url.match(/.fasta$/)) ) {
-                new UnindexedFasta({browser: this, urlTemplate: this.config.refSeqs.url})
-                    .getRefSeqs(function(refSeqs) {
-                        thisB.addRefseqs(refSeqs);
-                        deferred.resolve({success:true});
-                    }, function(error) {
-                        deferred.reject(error);
-                    });
-            } else if( this.config.refSeqs.url && this.config.refSeqs.url.match(/.sizes/) ) {
-                new ChromSizes({browser: this, urlTemplate: this.config.refSeqs.url})
-                    .getRefSeqs(function(refSeqs) {
-                        thisB.addRefseqs(refSeqs);
-                        deferred.resolve({success:true});
-                    }, function(error) {
-                        deferred.reject(error);
-                    });
-            } else if( 'data' in this.config.refSeqs ) {
-                this.addRefseqs( this.config.refSeqs.data );
-                deferred.resolve({success:true});
-            } else {
-                request(this.resolveUrl(this.config.refSeqs.url), {
-                    handleAs: 'text',
-                    headers: {
-                        'X-Requested-With': null
-                    }
-                } )
-                    .then( function(o) {
-                               thisB.addRefseqs( dojo.fromJson(o) );
-                               deferred.resolve({success:true});
-                           },
-                           function( e ) {
-                               deferred.reject( 'Could not load reference sequence definitions. '+e );
-                           }
-                         );
-            }
+            request(this.resolveUrl(this.config.refSeqs.url), {
+                handleAs: 'text',
+                headers: {
+                    'X-Requested-With': null
+                }
+            } )
+                .then( function(o) {
+                           thisB.addRefseqs( dojo.fromJson(o) );
+                           deferred.resolve({success:true});
+                       },
+                       function( e ) {
+                           deferred.reject( 'Could not load reference sequence definitions. '+e );
+                       }
+                     );
         }
     });
 },
@@ -756,7 +743,7 @@ regularizeReferenceName: function( refname ) {
                      .replace(/^([a-z]*)0+/,'$1')
                      .replace(/^(\d+l?r?|x|y)$/, 'chr$1' )
                      .replace(/^(x?)(ix|iv|v?i{0,3})$/, 'chr$1$2' )
-                     .replace(/^mt?(dna)?$/, 'chrm');
+                     .replace(/^mt?$/, 'chrm');
 
     return refname;
 },
@@ -1354,7 +1341,7 @@ openFastaElectron: function() {
                     trackList.tracks[0].urlTemplate = fasta;
                     trackList.tracks[0].faiUrlTemplate = fai;
                     trackList.tracks[0].gziUrlTemplate = gzi;
-                    trackList.refSeqs = {faiUrlTemplate: fai, storeClass:  'JBrowse/Store/SeqFeature/BgzipIndexedFasta', gziUrlTemplate: gzi};
+                    trackList.refSeqs = fai;
                 }
                 else if( confs[0].store.fasta && confs[0].store.fai ) {
                     var fasta = Util.replacePath( confs[0].store.fasta.url );
@@ -1362,20 +1349,18 @@ openFastaElectron: function() {
                     trackList.tracks[0].storeClass= 'JBrowse/Store/SeqFeature/IndexedFasta';
                     trackList.tracks[0].urlTemplate = fasta;
                     trackList.tracks[0].faiUrlTemplate = fai;
-                    trackList.refSeqs = {faiUrlTemplate: fai, storeClass:  'JBrowse/Store/SeqFeature/IndexedFasta'};
+                    trackList.refSeqs = fai;
                 }
                 else if( confs[0].store.type == 'JBrowse/Store/SeqFeature/TwoBit' ) {
                     var f2bit = Util.replacePath( confs[0].store.blob.url );
                     trackList.tracks[0].storeClass = 'JBrowse/Store/SeqFeature/TwoBit';
                     trackList.tracks[0].urlTemplate = f2bit;
                     trackList.refSeqs = f2bit;
-                    trackList.refSeqs = {urlTemplate: f2bit, storeClass:  'JBrowse/Store/SeqFeature/TwoBit'};
                 }
                 else if( confs[0].store.type == 'JBrowse/Store/SeqFeature/ChromSizes' ) {
                     var sizes = Util.replacePath( confs[0].store.blob.url );
                     delete trackList.tracks;
                     trackList.refSeqs = sizes;
-                    trackList.refSeqs = {urlTemplate: sizes, storeClass:  'JBrowse/Store/SeqFeature/ChromSizes'};
                 }
                 else {
                     var fasta = Util.replacePath( confs[0].store.fasta.url );
@@ -1390,7 +1375,7 @@ openFastaElectron: function() {
                     }
                     trackList.tracks[0].storeClass = 'JBrowse/Store/SeqFeature/UnindexedFasta';
                     trackList.tracks[0].urlTemplate = fasta;
-                    trackList.refSeqs = {urlTemplate: fasta, storeClass: 'JBrowse/Store/SeqFeature/UnindexedFasta'};
+                    trackList.refSeqs = fasta;
                 }
 
                 // fix dir to be user data if we are accessing a url for fasta
@@ -2143,7 +2128,7 @@ loadConfig: function () {
             const parsedDataRoot = url.parse(url.resolve(window.location.href,this.config.dataRoot))
             if (parsedDataRoot.host) {
                 const currentParsed = url.parse(window.location.href)
-                if (!Util.isElectron() && (parsedDataRoot.host !== currentParsed.host || parsedDataRoot.protocol !== currentParsed.protocol))
+                if (parsedDataRoot.host !== currentParsed.host || parsedDataRoot.protocol !== currentParsed.protocol)
                     throw new Error('Invalid JBrowse dataRoot setting. For security, absolute URLs are not allowed. Set `allowCrossOriginDataRoot` to true to disable this security check.')
             }
         }
@@ -2384,14 +2369,11 @@ onFineMove: function(startbp, endbp) {
  * Asynchronously initialize our track metadata.
  */
 initTrackMetadata: function( callback ) {
-    var thisB = this
     return this._milestoneFunction( 'initTrackMetadata', function( deferred ) {
         var metaDataSourceClasses = dojo.map(
                                     (this.config.trackMetadata||{}).sources || [],
                                     function( sourceDef ) {
-                                        var url = sourceDef.relativeUrl ?
-                                            Util.resolveUrl(thisB.config.dataRoot+'/',sourceDef.relativeUrl) :
-                                            (sourceDef.url || 'trackMeta.csv');
+                                        var url  = sourceDef.url || 'trackMeta.csv';
                                         var type = sourceDef.type || (
                                                 /\.csv$/i.test(url)     ? 'csv'  :
                                                 /\.js(on)?$/i.test(url) ? 'json' :
@@ -3222,29 +3204,30 @@ createNavBox: function( parent ) {
                       }
                   });
     dojo.connect( navbox, 'onselectstart', function(evt) { evt.stopPropagation(); return true; });
-
     // monkey-patch the combobox code to make a few modifications
     (function(){
-        var PatchedDropDownClass = dojo.declare(this.locationBox.dropDownClass, {
-            // add a moreMatches class to our hacked-in "more options" option
-            _createOption: function( item ) {
-                var option = this.inherited(arguments);
-                if( item.hitLimit )
-                    dojo.addClass( option, 'moreMatches');
-                return option;
-            },
-            // prevent the "more matches" option from being clicked
-            onClick: function( node ) {
-                if( dojo.hasClass(node, 'moreMatches' ) )
-                    return null;
+
+         // add a moreMatches class to our hacked-in "more options" option
+         var dropDownProto = eval(this.locationBox.dropDownClass).prototype;
+         var oldCreateOption = dropDownProto._createOption;
+         dropDownProto._createOption = function( item ) {
+             var option = oldCreateOption.apply( this, arguments );
+             if( item.hitLimit )
+                 dojo.addClass( option, 'moreMatches');
+             return option;
+         };
+
+         // prevent the "more matches" option from being clicked
+         var oldOnClick = dropDownProto.onClick;
+         dropDownProto.onClick = function( node ) {
+             if( dojo.hasClass(node, 'moreMatches' ) )
+                 return null;
 
 
-                var ret = this.inherited(arguments);
-                thisB.navigateTo(thisB.locationBox.get('value'))
-                return ret;
-            }
-        });
-        this.locationBox.dropDownClass = PatchedDropDownClass;
+            var ret = oldOnClick.apply( this, arguments );
+            thisB.navigateTo(thisB.locationBox.get('value'))
+            return ret;
+         };
     }).call(this);
 
     // make the 'Go' button

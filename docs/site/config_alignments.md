@@ -108,8 +108,8 @@ Note:  `colorBySize`, `colorByOrientationAndSize` invoke insert size stats estim
 |Option|Value|
 |------|-----|
 |`cacheMismatches`|Cache mismatch calculations so that long reads are faster to browser. Default: false. Added in 1.12.3|
-|`renderAlignment`|Add a text display of the BAM alignment on a single line in the View details popup. Default: false|
-|`renderPrettyAlignment`|Add a text display of the BAM alignment using prettier "BLAST style" to the View details popup. Default: false|
+|`renderAlignments`|Add a text display of the BAM alignment on a single line in the View details popup. Default: false|
+|`renderPrettyAlignments`|Add a text display of the BAM alignment using prettier "BLAST style" to the View details popup. Default: false|
 |`orientationType`|Set the orientation pattern. Default is 'fr' according to illumina adapters that face each other. Other options are 'rf' and 'ff'. See https://software.broadinstitute.org/software/igv/interpreting_pair_orientations for more info. Added in 1.16.0|
 
 # Alignments2 coloring schemes
@@ -176,7 +176,6 @@ They display everything that `Alignments2` tracks do, plus they support the same
 |`baiUrlTemplate`|URL for the corresponding BAM index (BAI) file. If not set, this is assumed to be the same URL as `urlTemplate` with `.bai` appended.|
 |`csiUrlTemplate`|URL for the corresponding BAM index (CSI) file. Must be set manually in the case that it is being used.|
 |`chunkSizeLimit`|Maximum size in bytes of BAM chunks that the browser will try to deal with. Default 5000000 (5 MiB). When this is exceeded, most tracks will display some kind of "Too much data" message. If you increase this, be careful. You could blow up your web browser.|
-|`fetchSizeLimit`|Maximum size in bytes of a single BAM request that the browser will try to deal with. Default 100000000 (100 MiB). When this is exceeded, most tracks will display some kind of "Too much data" message. If you increase this, be careful. You could blow up your web browser.|
 
 `Note: you can also increase maxFeatureScreenDensity if you get the "Too much data to show; zoom in to see detail".`
 

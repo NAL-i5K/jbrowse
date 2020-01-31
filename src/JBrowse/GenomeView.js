@@ -1,4 +1,3 @@
-import normalizeWheel from 'normalize-wheel'
 define([
            'dojo/_base/declare',
            'dojo/_base/array',
@@ -661,19 +660,41 @@ wheelScroll: function( event ) {
     if ( !event )
         event = window.event;
 
-    let { pixelX: x, pixelY: y} = normalizeWheel(event);
+    // if( window.WheelEvent )
+    //     event = window.WheelEvent;
+
+    var delta = { x: 0, y: 0 };
+    if( 'wheelDeltaX' in event ) {
+        delta.x = event.wheelDeltaX/2;
+        delta.y = event.wheelDeltaY/2;
+    }
+    else if( 'deltaX' in event ) {
+        var multiplier = navigator.userAgent.indexOf("OS X 10.9")!==-1 ? -5 : -40;
+        delta.x = Math.abs(event.deltaY) > Math.abs(2*event.deltaX) ? 0 : event.deltaX*multiplier;
+        delta.y = event.deltaY*-10;
+    }
+    else if( event.wheelDelta ) {
+        delta.y = event.wheelDelta/2;
+        if( window.opera )
+            delta.y = -delta.y;
+    }
+    else if( event.detail ) {
+        delta.y = -event.detail*100;
+    }
+
+    delta.x = Math.round( delta.x * 2 );
+    delta.y = Math.round( delta.y );
 
     var didScroll = false
 
-    if( x ) {
-        this.keySlideX( x );
+    if( delta.x ) {
+        this.keySlideX( -delta.x );
         didScroll = true
     }
-    if( y ) {
-        y = -y
+    if( delta.y ) {
         // 60 pixels per mouse wheel event
         var prevY = this.getY()
-        var currY = this.setY( prevY - y );
+        var currY = this.setY( prevY - delta.y );
         // check if clamping happened
         if(currY !== prevY) {
             didScroll = true

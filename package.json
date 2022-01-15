@@ -37,7 +37,7 @@
     "node-fetch": "^2.2.0",
     "node-getopt": "^0.2.3",
     "optimist": "^0.6.1",
-    "shelljs": "^0.7.8"
+    "shelljs": "^0.8.5"
   },
   "devDependencies": {
     "@gmod/bam": "^1.0.20",
